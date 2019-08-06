@@ -1,8 +1,8 @@
 <?php
 include_once("class.PDOFactory.php");
-abstract class DataBoundObject {
+abstract class Model {
     protected $_model;
-    protected $ID;
+    protected $Id;
     protected $PDO;
     protected $tableName;
     protected $relationMap;
@@ -32,7 +32,7 @@ abstract class DataBoundObject {
      * @return void
      */
     public function load() {
-        if(isset($this->ID)) {
+        if($this->existObject() && !$this->isLoaded) {
             $strQuery = 'SELECT * ';
             $strQuery .= 'FROM ' . $this->tableName;
             $strQuery .= 'WHERE id = :id';
@@ -104,10 +104,8 @@ abstract class DataBoundObject {
                     
                     if(is_int($actualVal) || is_null($actualVal)) {
                         $objectStatement->bindValue(':' . $value, $actualVal, PDO::PARAM_INT);
-                        echo ':' . $value ." - ".$actualVal. "<br>";
                     } else {
                         $objectStatement->bindValue(':' . $value, $actualVal, PDO::PARAM_STR);
-                        echo ':' . $value ." - ".$actualVal. "<br>";
                     }
                 }
             }
@@ -117,7 +115,7 @@ abstract class DataBoundObject {
 
         if(!$result) {
             Logger::log(Logger::ERROR, "Fallo al ejecutar query query de INSERT. Error: " . $objectStatement->errorCode() . " " . $objectStatement->errorInfo()[2]);
-            exit;
+            //exit;
         }
 
         if(!$this->idAutoDefined) {
@@ -178,7 +176,7 @@ abstract class DataBoundObject {
                 $result = $objectStatement->execute();
                 if(!$result) {
                     Logger::log(Logger::ERROR, "Fallo al ejecutar query SELECT. Error: " . $objectStatement->errorCode() . " " . $objectStatement->errorInfo()[2]);
-                    exit;
+                    //exit;
                 }
                 $row = $objectStatement->fetchColumn();
     
@@ -205,7 +203,7 @@ abstract class DataBoundObject {
 
 
     /**
-     * Méotodo mágico __call. Se encargar de controlar las consultas o modificaciones de miembros de
+     * Método mágico __call. Se encargar de controlar las consultas o modificaciones de miembros de
      * la clase devolviendo o seteando el adecuado.
      * 
      * @param string $strFunction nombre del miembro al que se llama
@@ -237,8 +235,11 @@ abstract class DataBoundObject {
      */
     protected function setAccessor($strMember, $newValue) {
         if(property_exists($this, $strMember)) {
-            $this->$strMember = $newValue;
-            $this->arrModifiedRelations[$strMember] = "1";
+            if(!$this->isLoaded || ($this->isLoaded && $newValue !== $this->$strMember)) {
+                $this->arrModifiedRelations[$strMember] = "1";
+            }
+            $this->$strMember = $newValue;   
+            
 
             if($strMember == "ID") {
                 $this->idAutoDefined = true;
